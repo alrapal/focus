@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal::spi::{Error, ErrorType, Operation, SpiBus, SpiDevice};
+use embedded_hal::spi::{SpiBus, SpiDevice, ErrorType, Operation, Error};
 use esp_hal::{
     clock::CpuClock,
     gpio::{Output, OutputConfig},
@@ -19,7 +19,7 @@ struct SpiDeviceWrapper<'a, SPI> {
     spi: &'a mut SPI,
 }
 
-impl<'a, SPI, E> ErrorType for SpiDeviceWrapper<'a, SPI>
+impl<SPI, E> ErrorType for SpiDeviceWrapper<'_, SPI>
 where
     SPI: SpiBus<u8, Error = E>,
     E: Error,
@@ -27,14 +27,17 @@ where
     type Error = E;
 }
 
-impl<'a, SPI, E> SpiDevice for SpiDeviceWrapper<'a, SPI>
+impl<SPI, E> SpiDevice for SpiDeviceWrapper<'_, SPI>
 where
-    SPI: embedded_hal::spi::SpiBus<u8, Error = E>,
-    E: embedded_hal::spi::Error,
+    SPI: SpiBus<u8, Error = E>,
+    E: Error,
 {
-    fn transaction(&mut self, operations: &mut [Operation<'_, u8>]) -> Result<(), Self::Error> {
+    fn transaction(
+        &mut self,
+        operations: &mut [Operation<'_, u8>],
+    ) -> Result<(), Self::Error> {
         for operation in operations {
-            //! Todo: Implement the rest of the transaction logic
+            // ! Todo: Implement the rest of the transaction
             match operation {
                 Operation::Write(data) => {
                     self.spi.write(data)?;
@@ -99,9 +102,9 @@ fn main() -> ! {
     .with_mosi(mosi)
     .with_cs(cs); // unstable
 
-    let mut display_spi_device_wrapper = SpiDeviceWrapper { spi: &mut spi };
+    let display_spi_device_wrapper = SpiDeviceWrapper {spi: &mut spi};
 
-    let display_interface = SPIDisplayInterface::new(display_spi_device_wrapper, dc);
+    let _display_interface = SPIDisplayInterface::new(display_spi_device_wrapper, dc);
 
     loop {
         let delay_start = Instant::now();
