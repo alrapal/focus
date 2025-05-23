@@ -1,70 +1,18 @@
 #![no_std]
 #![no_main]
 
-use embedded_hal::spi::{SpiBus, SpiDevice, ErrorType, Operation, Error};
 use esp_hal::{
-    clock::CpuClock,
-    gpio::{Output, OutputConfig},
-    main,
-    spi::{
-        master::{Config, Spi},
+    clock::CpuClock, gpio::{Level, Output, OutputConfig}, main, spi::{
+        master::{Config, Spi as BusSpi},
         Mode,
-    },
-    time::{Duration, Instant, Rate},
+    }, time::{Duration, Instant, Rate},
+    delay::Delay,
 };
 use esp_println::println;
-use gc9a01::SPIDisplayInterface;
-
-struct SpiDeviceWrapper<'a, SPI> {
-    spi: &'a mut SPI,
-}
-
-impl<SPI, E> ErrorType for SpiDeviceWrapper<'_, SPI>
-where
-    SPI: SpiBus<u8, Error = E>,
-    E: Error,
-{
-    type Error = E;
-}
-
-impl<SPI, E> SpiDevice for SpiDeviceWrapper<'_, SPI>
-where
-    SPI: SpiBus<u8, Error = E>,
-    E: Error,
-{
-    fn transaction(
-        &mut self,
-        operations: &mut [Operation<'_, u8>],
-    ) -> Result<(), Self::Error> {
-        for operation in operations {
-            // ! Todo: Implement the rest of the transaction
-            match operation {
-                Operation::Write(data) => {
-                    self.spi.write(data)?;
-                }
-                Operation::Transfer(write, read) => {
-                    self.spi.transfer(write, read)?;
-                }
-                Operation::TransferInPlace(words) => {
-                    self.spi.transfer_in_place(words)?;
-                }
-                Operation::Read(data) => {
-                    self.spi.read(data)?;
-                }
-                Operation::DelayNs(delay) => {
-                    // At 240Mhz, 1 tick is more or less 4ns. (4.16)
-                    const NS_PER_TICK: u32 = 4;
-                    let mut ns_in_tick = *delay / NS_PER_TICK;
-
-                    while ns_in_tick > 0 {
-                        ns_in_tick -= 1;
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-}
+use focus::spi_device_wrapper::SpiDeviceWrapper;
+use gc9a01::{
+    display::DisplayResolution240x240, prelude::DisplayRotation, Gc9a01, SPIDisplayInterface
+};
 
 #[panic_handler]
 fn panic(e: &core::panic::PanicInfo) -> ! {
@@ -78,38 +26,59 @@ fn main() -> ! {
 
     let config = esp_hal::Config::default().with_cpu_clock(CpuClock::max());
     let peripherals = esp_hal::init(config);
+    let mut delay = Delay::new();
 
+    // BusSpi
     let sclk = peripherals.GPIO12;
     let miso = peripherals.GPIO11;
     let mosi = peripherals.GPIO13;
-    let cs = peripherals.GPIO10;
+    // SpiDevice
+    let cs = Output::new(peripherals.GPIO10, Level::High, OutputConfig::default());
     // need to configure as output to respect bound trait for SPIDisplayInterface
-    let dc = Output::new(
-        peripherals.GPIO3,
-        esp_hal::gpio::Level::Low,
-        OutputConfig::default(),
-    );
+    let dc = Output::new(peripherals.GPIO3, Level::Low, OutputConfig::default());
+    let mut rst = Output::new(peripherals.GPIO8, Level::Low, OutputConfig::default());
 
-    let mut spi: Spi<'_, esp_hal::Blocking> = Spi::new(
+    let mut spi: BusSpi<'_, esp_hal::Blocking> = BusSpi::new(
         peripherals.SPI2,
         Config::default()
-            .with_frequency(Rate::from_khz(100))
+            .with_frequency(Rate::from_mhz(80))
             .with_mode(Mode::_0),
     )
     .unwrap()
     .with_sck(sclk)
     .with_miso(miso)
-    .with_mosi(mosi)
-    .with_cs(cs); // unstable
+    .with_mosi(mosi);
 
-    let display_spi_device_wrapper = SpiDeviceWrapper {spi: &mut spi};
+    let display_spi_device = SpiDeviceWrapper::new(&mut spi, cs, 4);
 
-    let _display_interface = SPIDisplayInterface::new(display_spi_device_wrapper, dc);
+    let display_interface = SPIDisplayInterface::new(display_spi_device, dc);
+    let mut display_driver = Gc9a01::new(
+        display_interface,
+        DisplayResolution240x240,
+        DisplayRotation::Rotate0,
+    ).into_buffered_graphics();
+    display_driver.reset(&mut rst, &mut delay).unwrap();
+
+    // let buffer: [u16; 240 * 240] = [0xff_u16; 240 * 240];
+    display_driver.init_with_addr_mode(&mut delay).unwrap();
+
+    let color_list :[u16; 4]= [
+        0xF800_u16,
+        0xFFE0_u16,
+        0x7E0_u16,
+        0x1F_u16
+    ];
+    let mut iter = color_list.iter().cycle();    
 
     loop {
         let delay_start = Instant::now();
-
-        while delay_start.elapsed() < Duration::from_millis(250) {}
+        if let Some(color) = iter.next(){
+            display_driver.fill(*color);
+            display_driver.flush().unwrap();
+        };
+        println!("In Loop");
+        
+        while delay_start.elapsed() < Duration::from_millis(1000) {}
     }
 
     // for inspiration have a look at the examples at https://github.com/esp-rs/esp-hal/tree/esp-hal-v1.0.0-beta.0/examples/src/bin
