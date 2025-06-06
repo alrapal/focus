@@ -3,6 +3,12 @@
 
 use core::cell::RefCell;
 use critical_section::Mutex;
+use embedded_graphics::{
+    pixelcolor::Rgb565,
+    prelude::{Point, Primitive, RgbColor, WebColors},
+    primitives::{Circle, PrimitiveStyle},
+    Drawable,
+};
 use esp_hal::{
     clock::CpuClock,
     delay::Delay,
@@ -13,12 +19,9 @@ use esp_hal::{
     Blocking,
 };
 use esp_println::println;
-use focus::{
-    drivers::{
-        DisplayResolution240x240, DisplayRotation, Gc9a01, SPIDisplayInterface, SpiPeripheral,
-    },
-    hardware::{button, spi_bus},
-};
+use focus::
+    hardware::{button, spi_bus, screen}
+;
 
 #[panic_handler]
 fn panic(e: &core::panic::PanicInfo) -> ! {
@@ -27,7 +30,7 @@ fn panic(e: &core::panic::PanicInfo) -> ! {
 }
 
 static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
-static SPI_BUS: Mutex<RefCell<Option<Spi<'_, Blocking>>>> = Mutex::new(RefCell::new(None));
+static SPI_BUS: Mutex<RefCell<Option<Spi<'static, Blocking>>>> = Mutex::new(RefCell::new(None));
 
 #[main]
 fn main() -> ! {
@@ -50,9 +53,9 @@ fn main() -> ! {
     });
 
     // SpiDevice
-    let cs = Output::new(peripherals.GPIO10, Level::High, OutputConfig::default());
+    // let _cs = Output::new(peripherals.GPIO10, Level::High, OutputConfig::default());
     // need to configure as output to respect bound trait for SPIDisplayInterface
-    let dc = Output::new(peripherals.GPIO3, Level::Low, OutputConfig::default());
+    // let dc = Output::new(peripherals.GPIO3, Level::Low, OutputConfig::default());
     let mut rst = Output::new(peripherals.GPIO8, Level::Low, OutputConfig::default());
 
     let spi = spi_bus::init_spi_bus(peripherals.SPI2, peripherals.GPIO12, peripherals.GPIO13);
@@ -61,32 +64,62 @@ fn main() -> ! {
         SPI_BUS.borrow_ref_mut(cs).replace(spi);
     });
 
-    let display_spi_device = SpiPeripheral::new(&SPI_BUS, cs, 4);
-
-    let display_interface = SPIDisplayInterface::new(display_spi_device, dc);
-    let mut display_driver = Gc9a01::new(
-        display_interface,
-        DisplayResolution240x240,
-        DisplayRotation::Rotate0,
-    )
-    .into_buffered_graphics();
+    let mut display_driver = screen::init_screen(peripherals.GPIO10, peripherals.GPIO3, &SPI_BUS);
 
     display_driver.reset(&mut rst, &mut delay).unwrap();
 
     display_driver.init_with_addr_mode(&mut delay).unwrap();
+    display_driver.fill(0);
 
-    let color_list: [u16; 4] = [0xF800_u16, 0xFFE0_u16, 0x7E0_u16, 0x1F_u16];
+    let mut decrease = false;
+    let mut radius = 50_u32;
+    let center = Point::new(120, 120);
+    let mut top_left = Point::new(center.x - radius as i32, center.y - radius as i32);
+    let circle_style = PrimitiveStyle::with_fill(Rgb565::RED);
+    let mut circle = Circle::new(top_left, radius * 2).into_styled(circle_style);
+
+    circle.draw(&mut display_driver).unwrap();
+    display_driver.flush().unwrap();
+
+    let color_list: [Rgb565; 4] = [
+        Rgb565::CSS_ALICE_BLUE,
+        Rgb565::CSS_YELLOW,
+        Rgb565::CSS_SEA_GREEN,
+        Rgb565::CSS_SALMON,
+    ];
     let mut iter = color_list.iter().cycle();
 
     loop {
         let delay_start = Instant::now();
-        if let Some(color) = iter.next() {
-            display_driver.fill(*color);
-            display_driver.flush().unwrap();
-        };
-        println!("In Loop");
 
-        while delay_start.elapsed() < Duration::from_millis(1000) {}
+        if radius == 0 {
+            if let Some(color) = iter.next() {
+                circle.style.fill_color = Some(*color);
+            }
+            decrease = false;
+        } else if radius == center.y as u32 {
+            decrease = true;
+        }
+
+        if decrease {
+            display_driver.fill(0);
+            radius -= 1;
+        } else {
+            radius += 1;
+        }
+
+        top_left = Point::new(center.x - radius as i32, center.y - radius as i32);
+        circle.primitive.diameter = radius * 2;
+        circle.primitive.top_left = top_left;
+        circle.draw(&mut display_driver).unwrap();
+        display_driver.flush().unwrap();
+        // if let Some(color) = iter.next() {
+        //     display_driver.fill(*color);
+        //     display_driver.flush().unwrap();
+        // };
+        // println!("In Loop");
+
+        while delay_start.elapsed() < Duration::from_millis(20) {}
     }
 
     // for inspiration have a look at the examples at https://github.com/esp-rs/esp-hal/tree/esp-hal-v1.0.0-beta.0/examples/src/bin
