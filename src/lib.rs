@@ -1,2 +1,3 @@
 #![no_std]
-pub mod spi_device_wrapper;
+pub mod drivers;
+pub mod hardware;
