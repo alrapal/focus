@@ -1,15 +1,14 @@
 use esp_hal::{
-    gpio::GpioPin,
-    peripherals::SPI2,
+    peripherals::{GPIO12, GPIO13, SPI2},
     spi::master::{Config, Spi},
     time::Rate,
     Blocking,
 };
 
 pub fn init_spi_bus(
-    spi_peripheral: SPI2,
-    sclk: GpioPin<12>,
-    mosi: GpioPin<13>,
+    spi_peripheral: SPI2<'static>,
+    sclk: GPIO12<'static>,
+    mosi: GPIO13<'static>,
 ) -> Spi<'static, Blocking> {
     Spi::new(
         spi_peripheral,

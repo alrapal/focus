@@ -19,9 +19,7 @@ use esp_hal::{
     Blocking,
 };
 use esp_println::println;
-use focus::
-    hardware::{button, spi_bus, screen}
-;
+use focus::hardware::{button, screen, spi_bus};
 
 #[panic_handler]
 fn panic(e: &core::panic::PanicInfo) -> ! {
@@ -45,32 +43,30 @@ fn main() -> ! {
     io.set_interrupt_handler(button_handler);
 
     // Button
+    // let config = InputConfig::default().with_pull(Pull::Up);
+    // let mut boot_button =  Input::new(peripherals.GPIO0, config);
     let mut boot_button = button::init_boot_button(peripherals.GPIO0);
-
     critical_section::with(|cs| {
         boot_button.listen(esp_hal::gpio::Event::FallingEdge);
         BUTTON.borrow_ref_mut(cs).replace(boot_button);
     });
 
-    // SpiDevice
-    // let _cs = Output::new(peripherals.GPIO10, Level::High, OutputConfig::default());
-    // need to configure as output to respect bound trait for SPIDisplayInterface
-    // let dc = Output::new(peripherals.GPIO3, Level::Low, OutputConfig::default());
-    let mut rst = Output::new(peripherals.GPIO8, Level::Low, OutputConfig::default());
-
+    // SPI Bus
     let spi = spi_bus::init_spi_bus(peripherals.SPI2, peripherals.GPIO12, peripherals.GPIO13);
-
     critical_section::with(|cs| {
         SPI_BUS.borrow_ref_mut(cs).replace(spi);
     });
 
+    // Screen
     let mut display_driver = screen::init_screen(peripherals.GPIO10, peripherals.GPIO3, &SPI_BUS);
+    let mut rst = Output::new(peripherals.GPIO8, Level::Low, OutputConfig::default());
 
     display_driver.reset(&mut rst, &mut delay).unwrap();
 
     display_driver.init_with_addr_mode(&mut delay).unwrap();
     display_driver.fill(0);
 
+    // Shape
     let mut decrease = false;
     let mut radius = 50_u32;
     let center = Point::new(120, 120);
@@ -81,13 +77,14 @@ fn main() -> ! {
     circle.draw(&mut display_driver).unwrap();
     display_driver.flush().unwrap();
 
-    let color_list: [Rgb565; 4] = [
-        Rgb565::CSS_ALICE_BLUE,
-        Rgb565::CSS_YELLOW,
-        Rgb565::CSS_SEA_GREEN,
-        Rgb565::CSS_SALMON,
+    const COLOR_LIST: [Rgb565; 4] = [
+        Rgb565::CSS_DARK_RED,
+        Rgb565::CSS_AQUA,
+        Rgb565::CSS_YELLOW_GREEN,
+        Rgb565::CSS_BLUE_VIOLET,
     ];
-    let mut iter = color_list.iter().cycle();
+
+    let mut iter = COLOR_LIST.iter().cycle();
 
     loop {
         let delay_start = Instant::now();
@@ -113,11 +110,6 @@ fn main() -> ! {
         circle.primitive.top_left = top_left;
         circle.draw(&mut display_driver).unwrap();
         display_driver.flush().unwrap();
-        // if let Some(color) = iter.next() {
-        //     display_driver.fill(*color);
-        //     display_driver.flush().unwrap();
-        // };
-        // println!("In Loop");
 
         while delay_start.elapsed() < Duration::from_millis(20) {}
     }
