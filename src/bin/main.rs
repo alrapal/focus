@@ -23,9 +23,10 @@ use esp_hal::{
     Blocking,
 };
 use esp_println::println;
-use focus::{
-    drivers::rotary_encoder,
-    hardware::{button, screen, spi_bus},
+use focus::hardware::{
+    button,
+    encoder::{self, Encode},
+    screen, spi_bus,
 };
 
 #[panic_handler]
@@ -36,7 +37,8 @@ fn panic(e: &core::panic::PanicInfo) -> ! {
 // Static modules in Mutex for safe access between threads / interrupts
 static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
 static SPI_BUS: Mutex<RefCell<Option<Spi<'static, Blocking>>>> = Mutex::new(RefCell::new(None));
-static HY_040: Mutex<RefCell<Option<rotary_encoder::Hy040>>> = Mutex::new(RefCell::new(None));
+static HY_040: Mutex<RefCell<Option<encoder::EncoderSwitchEventListener>>> =
+    Mutex::new(RefCell::new(None));
 static DEBOUNCE_TIMER: Mutex<RefCell<Option<Instant>>> = Mutex::new(RefCell::new(None));
 static ENCODER_TIMER: Mutex<RefCell<Option<PeriodicTimer<Blocking>>>> =
     Mutex::new(RefCell::new(None));
@@ -49,6 +51,7 @@ static BOOT_PRESSED: AtomicBool = AtomicBool::new(false);
 // Constant values
 const DELAY_LOOP_MS: u64 = 10;
 const DEBOUNCE_MS: u64 = 200;
+const ENCODER_TIMER_MS: u64 = 5;
 const COLOR_LIST: [Rgb565; 3] = [Rgb565::CSS_RED, Rgb565::CSS_GREEN, Rgb565::CSS_BLUE];
 const SCREEN_WIDTH_PIXELS: u8 = 240;
 const FACTOR_TWO: u8 = 2;
@@ -82,12 +85,14 @@ fn main() -> ! {
     let mut boot_button = button::init_boot_button(peripherals.GPIO0);
     boot_button.listen(esp_hal::gpio::Event::FallingEdge);
 
-    // HY-040 button
+    // HY-040
     let config = InputConfig::default().with_pull(Pull::Up);
     let clk = Input::new(peripherals.GPIO4, config);
     let dt = Input::new(peripherals.GPIO5, config);
     let sw = Input::new(peripherals.GPIO6, config);
-    let hy_040 = rotary_encoder::Hy040::new(clk, dt, sw);
+    let hy_040 = encoder::Encoder::new(clk, dt)
+        .add_switch(sw)
+        .add_switch_listener(esp_hal::gpio::Event::FallingEdge);
 
     // SPI Bus
     let spi = spi_bus::init_spi_bus(peripherals.SPI2, peripherals.GPIO12, peripherals.GPIO13);
@@ -103,7 +108,9 @@ fn main() -> ! {
         // Start the timer after it's been placed in Mutex, to start triggering the update for the encoder
         let mut encoder_timer = ENCODER_TIMER.borrow_ref_mut(cs);
         if let Some(encoder_timer) = encoder_timer.as_mut() {
-            encoder_timer.start(Duration::from_millis(10_u64)).unwrap();
+            encoder_timer
+                .start(Duration::from_millis(ENCODER_TIMER_MS))
+                .unwrap();
         }
     });
 
@@ -137,7 +144,6 @@ fn main() -> ! {
         // Handle encoder switch pressed
         // swap return current value and replaces it with provided one
         if SW_PRESSED.swap(false, core::sync::atomic::Ordering::Relaxed) {
-            println!("SW press");
             // reset counter if exceed screen min max bound
             COUNTER.swap(0, core::sync::atomic::Ordering::Relaxed);
         }
@@ -145,7 +151,6 @@ fn main() -> ! {
         // Handle boot button pressed
         // swap return current value and replaces it with provided one
         if BOOT_PRESSED.swap(false, core::sync::atomic::Ordering::Relaxed) {
-            println!("BOOT press");
             // Set the circle background color to the next color in the list
             if let Some(color) = iter.next() {
                 circle.style.fill_color = Some(*color);
@@ -221,11 +226,9 @@ fn button_handler() {
 
         // Handle the switch attached to the encoder
         if let Some(hy_040) = hy_040.as_mut() {
-            if hy_040.is_sw_interrupt_set() {
+            if hy_040.has_been_pressed() {
                 // store saves the provided value into atomic
                 SW_PRESSED.store(true, core::sync::atomic::Ordering::Relaxed);
-                // We need to clear interrupt once handled
-                hy_040.clear_sw_interrupt();
             }
         }
     });
@@ -242,15 +245,15 @@ fn encoder_handler() {
         // Update the counter based on the direction provided by the encoder
         if let (Some(hy_040), Some(timer)) = (hy_040.as_mut(), timer.as_mut()) {
             match hy_040.update() {
-                rotary_encoder::Direction::CW => {
+                encoder::Direction::CW => {
                     // fetch add increase with provided value
                     COUNTER.fetch_add(1, core::sync::atomic::Ordering::Relaxed)
                 }
-                rotary_encoder::Direction::CCW => {
+                encoder::Direction::CCW => {
                     // fetch sub decrease with provided value
                     COUNTER.fetch_sub(1, core::sync::atomic::Ordering::Relaxed)
                 }
-                rotary_encoder::Direction::Rest => 0,
+                encoder::Direction::Rest => 0,
             };
 
             // We need to clear interrupt once handled

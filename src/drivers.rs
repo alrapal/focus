@@ -1,4 +1,3 @@
-pub mod rotary_encoder;
 mod spi_peripheral;
 // Crate re-export
 pub use gc9a01::{
