@@ -5,11 +5,11 @@ use esp_hal::{
     Blocking,
 };
 
-pub fn init_spi_bus(
-    spi_peripheral: SPI2<'static>,
-    sclk: GPIO12<'static>,
-    mosi: GPIO13<'static>,
-) -> Spi<'static, Blocking> {
+pub fn init_spi_bus<'l>(
+    spi_peripheral: SPI2<'l>,
+    sclk: GPIO12<'l>,
+    mosi: GPIO13<'l>,
+) -> Spi<'l, Blocking> {
     Spi::new(
         spi_peripheral,
         Config::default()
