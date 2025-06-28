@@ -1,0 +1,16 @@
+[package]
+edition = "2021"
+name = "focus"
+version = "0.1.0"
+
+[[bin]]
+name = "focus"
+path = "./src/bin/main.rs"
+
+[dependencies]
+critical-section = "1.2.0"
+embedded-graphics = "0.8.1"
+embedded-hal = "1.0.0"
+esp-hal = { version = "1.0.0-beta.1", features = ["esp32s3", "unstable"] }
+esp-println = { version = "0.13.1", features = ["esp32s3"] }
+gc9a01-rs = "0.4.2"
