@@ -1,0 +1,47 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "shell",
+			"command": "cargo",
+			"args": [
+				"test",
+				"--workspace",
+				"--exclude", "focus",
+				"--features", "unit-tests"
+			],
+			"group": {
+				"kind" : "test",
+				"isDefault": true,
+			},
+			"label": "unit-tests",
+			"problemMatcher" : [],
+		},
+		{
+			"type": "shell",
+			"command": "sh",
+			"args": [
+				"${cwd}/scripts/build_debug.sh"
+			],
+			"group": {
+				"kind" : "build",
+				"isDefault": false,
+			},
+			"label": "Build debug script",
+			"problemMatcher" : [],
+		},
+		{
+			"type": "shell",
+			"command": "sh",
+			"args": [
+				"${cwd}/scripts/build_release.sh"
+			],
+			"group": {
+				"kind" : "build",
+				"isDefault": false,
+			},
+			"label": "Build release script",
+			"problemMatcher" : [],
+		},
+	]
+}
