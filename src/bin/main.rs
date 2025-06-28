@@ -37,7 +37,7 @@ fn panic(e: &core::panic::PanicInfo) -> ! {
 // Static modules in Mutex for safe access between threads / interrupts
 static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
 static SPI_BUS: Mutex<RefCell<Option<Spi<'static, Blocking>>>> = Mutex::new(RefCell::new(None));
-static HY_040: Mutex<RefCell<Option<encoder::EncoderSwitchEventListener>>> =
+static HY_040: Mutex<RefCell<Option<encoder::EncoderListener>>> =
     Mutex::new(RefCell::new(None));
 static DEBOUNCE_TIMER: Mutex<RefCell<Option<Instant>>> = Mutex::new(RefCell::new(None));
 static ENCODER_TIMER: Mutex<RefCell<Option<PeriodicTimer<Blocking>>>> =
@@ -245,11 +245,11 @@ fn encoder_handler() {
         // Update the counter based on the direction provided by the encoder
         if let (Some(hy_040), Some(timer)) = (hy_040.as_mut(), timer.as_mut()) {
             match hy_040.update() {
-                encoder::Direction::CW => {
+                encoder::Direction::Clockwise => {
                     // fetch add increase with provided value
                     COUNTER.fetch_add(1, core::sync::atomic::Ordering::Relaxed)
                 }
-                encoder::Direction::CCW => {
+                encoder::Direction::CounterClockwise => {
                     // fetch sub decrease with provided value
                     COUNTER.fetch_sub(1, core::sync::atomic::Ordering::Relaxed)
                 }

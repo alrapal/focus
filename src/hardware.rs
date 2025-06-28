@@ -6,7 +6,7 @@ pub mod spi_bus;
 pub mod encoder {
 
     pub use super::rotary_encoder::{
-        Direction, Encode, EncoderSwitchEventListener, EncoderWithSwitch,
-        EncoderWithoutSwitch as Encoder,
+        Direction, Encode, EncoderListener, EncoderSwitch,
+        BasicEncoder as Encoder,
     };
 }
