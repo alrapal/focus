@@ -7,15 +7,14 @@
 			"args": [
 				"test",
 				"--workspace",
-				"--exclude", "focus",
-				"--features", "unit-tests"
+				"--exclude",
+				"focus",
+				"--features",
+				"unit-tests"
 			],
-			"group": {
-				"kind" : "test",
-				"isDefault": true,
-			},
+			"group": "build",
 			"label": "unit-tests",
-			"problemMatcher" : [],
+			"problemMatcher": []
 		},
 		{
 			"type": "shell",
@@ -24,11 +23,11 @@
 				"${cwd}/scripts/build_debug.sh"
 			],
 			"group": {
-				"kind" : "build",
-				"isDefault": false,
+				"kind": "build",
+				"isDefault": false
 			},
 			"label": "Build debug script",
-			"problemMatcher" : [],
+			"problemMatcher": []
 		},
 		{
 			"type": "shell",
@@ -37,11 +36,25 @@
 				"${cwd}/scripts/build_release.sh"
 			],
 			"group": {
-				"kind" : "build",
-				"isDefault": false,
+				"kind": "build",
+				"isDefault": false
 			},
 			"label": "Build release script",
-			"problemMatcher" : [],
+			"problemMatcher": []
 		},
+		{
+			"type": "cargo",
+			"command": "run",
+			"args": [
+				"--target",
+				"xtensa-esp32s3-none-elf"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"label": "Build, Flash, Monitor",
+			"problemMatcher": []
+		}
 	]
 }
