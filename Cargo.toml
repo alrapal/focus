@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = [ "focus", "hl_driver"]
+members = ["focus", "hl_driver"]
 
 
 [profile.dev]
@@ -17,3 +17,9 @@ incremental = false
 lto = 'fat'
 opt-level = 's'
 overflow-checks = false
+
+[profile.test]
+# Rust debug is too slow.
+# For debug builds always builds with some optimization
+opt-level = 0
+overflow-checks = true

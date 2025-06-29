@@ -5,6 +5,7 @@
 			"type": "shell",
 			"command": "cargo",
 			"args": [
+				"+stable", // needed to use the host toolchain and not conflict with the esp toolchain
 				"test",
 				"--workspace",
 				"--exclude",
@@ -12,7 +13,10 @@
 				"--features",
 				"unit-tests"
 			],
-			"group": "build",
+			"group":{
+				"kind":"test",
+				"isDefault": true
+			},
 			"label": "unit-tests",
 			"problemMatcher": []
 		},
@@ -43,18 +47,17 @@
 			"problemMatcher": []
 		},
 		{
-			"type": "cargo",
-			"command": "run",
+			"type": "shell",
+			"command": "sh",
 			"args": [
-				"--target",
-				"xtensa-esp32s3-none-elf"
+				"${cwd}/scripts/build_flash_monitor.sh"
 			],
 			"group": {
 				"kind": "build",
-				"isDefault": true
+				"isDefault": false
 			},
 			"label": "Build, Flash, Monitor",
 			"problemMatcher": []
-		}
+		},
 	]
 }

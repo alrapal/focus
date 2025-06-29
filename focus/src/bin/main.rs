@@ -9,17 +9,22 @@ use embedded_graphics::{
     primitives::{Circle, PrimitiveStyle},
     Drawable,
 };
+use embedded_hal::digital::PinState;
 use esp_hal::{
     clock::CpuClock,
     delay::Delay,
-    gpio::{Input, Io, Level, Output, OutputConfig},
-    handler, main, ram,
+    gpio::{Input, InputConfig, Level, Output, OutputConfig, Pull},
+    main,
     spi::master::Spi,
-    time::{Duration, Instant},
+    time::Instant,
     Blocking,
 };
 use esp_println::println;
-use focus::hardware::{button, screen, spi_bus};
+use focus::hardware::{screen, spi_bus};
+use hl_driver::{
+    debounce,
+    switch::{self, Pressable},
+};
 
 #[panic_handler]
 fn panic(e: &core::panic::PanicInfo) -> ! {
@@ -27,7 +32,7 @@ fn panic(e: &core::panic::PanicInfo) -> ! {
     loop {}
 }
 
-static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
+// static BUTTON: Mutex<RefCell<Option<Input>>> = Mutex::new(RefCell::new(None));
 static SPI_BUS: Mutex<RefCell<Option<Spi<'static, Blocking>>>> = Mutex::new(RefCell::new(None));
 
 #[main]
@@ -38,18 +43,24 @@ fn main() -> ! {
     let peripherals = esp_hal::init(config);
     let mut delay = Delay::new();
 
-    //IO mulitplexer for gpio interrupt
-    let mut io = Io::new(peripherals.IO_MUX);
-    io.set_interrupt_handler(button_handler);
+    // Switches
+    let mut boot_button = switch::Switch::new(
+        Input::new(
+            peripherals.GPIO0,
+            InputConfig::default().with_pull(Pull::Up),
+        ),
+        PinState::Low,
+    )
+    .with_debounce(debounce::Debouncer::default());
 
-    // Button
-    // let config = InputConfig::default().with_pull(Pull::Up);
-    // let mut boot_button =  Input::new(peripherals.GPIO0, config);
-    let mut boot_button = button::init_boot_button(peripherals.GPIO0);
-    critical_section::with(|cs| {
-        boot_button.listen(esp_hal::gpio::Event::FallingEdge);
-        BUTTON.borrow_ref_mut(cs).replace(boot_button);
-    });
+    let mut hy040_switch = switch::Switch::new(
+        Input::new(
+            peripherals.GPIO6,
+            InputConfig::default().with_pull(esp_hal::gpio::Pull::Up),
+        ),
+        PinState::Low,
+    )
+    .with_debounce(debounce::Debouncer::default());
 
     // SPI Bus
     let spi = spi_bus::init_spi_bus(peripherals.SPI2, peripherals.GPIO12, peripherals.GPIO13);
@@ -87,12 +98,22 @@ fn main() -> ! {
     let mut iter = COLOR_LIST.iter().cycle();
 
     loop {
-        let delay_start = Instant::now();
+        let _delay_start = Instant::now();
 
-        if radius == 0 {
+        if boot_button.has_been_pressed().unwrap() {
+            println!("Reset radius");
+            radius = 0;
+            display_driver.fill(0);
+        }
+
+        if hy040_switch.has_been_pressed().unwrap() {
             if let Some(color) = iter.next() {
+                println!("Change color");
                 circle.style.fill_color = Some(*color);
             }
+        }
+
+        if radius == 0 {
             decrease = false;
         } else if radius == center.y as u32 {
             decrease = true;
@@ -111,34 +132,8 @@ fn main() -> ! {
         circle.draw(&mut display_driver).unwrap();
         display_driver.flush().unwrap();
 
-        while delay_start.elapsed() < Duration::from_millis(20) {}
+        // while delay_start.elapsed() < Duration::from_millis(200) {}
     }
 
     // for inspiration have a look at the examples at https://github.com/esp-rs/esp-hal/tree/esp-hal-v1.0.0-beta.0/examples/src/bin
-}
-
-#[handler]
-#[ram]
-fn button_handler() {
-    println!("GPIO interrupt");
-
-    if critical_section::with(|cs| {
-        BUTTON
-            .borrow_ref_mut(cs)
-            .as_mut()
-            .unwrap()
-            .is_interrupt_set()
-    }) {
-        println!("Button was source of interrupt");
-    } else {
-        println!("Button was not source of interrupt");
-    }
-
-    critical_section::with(|cs| {
-        BUTTON
-            .borrow_ref_mut(cs)
-            .as_mut()
-            .unwrap()
-            .clear_interrupt();
-    })
 }
