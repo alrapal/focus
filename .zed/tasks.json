@@ -1,0 +1,44 @@
+// Project tasks configuration. See https://zed.dev/docs/tasks for documentation.
+[
+  {
+    "label": "Test",
+    "command": "cargo",
+    "args": [
+      "+stable",
+      "test",
+      "--workspace",
+      "--exclude",
+      "focus",
+      "--features",
+      "unit-tests"
+    ],
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "reveal_target": "dock",
+    "hide": "never",
+    "shell": "system"
+  },
+  {
+    "label": "Run",
+    "command": "sh",
+    "args": ["./scripts/build_flash_monitor.sh"],
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "reveal_target": "dock",
+    "hide": "never",
+    "shell": "system"
+  },
+  {
+    "label": "Clean",
+    "command": "cargo",
+    "args": ["clean"],
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "reveal_target": "dock",
+    "hide": "never",
+    "shell": "system"
+  }
+]

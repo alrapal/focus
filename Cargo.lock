@@ -563,6 +563,7 @@ dependencies = [
  "esp-hal",
  "esp-println",
  "gc9a01-rs",
+ "hl_driver",
 ]
 
 [[package]]
@@ -666,6 +667,9 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 [[package]]
 name = "hl_driver"
 version = "0.1.0"
+dependencies = [
+ "embedded-hal 1.0.0",
+]
 
 [[package]]
 name = "ident_case"
