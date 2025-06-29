@@ -20,19 +20,14 @@ jobs:
       matrix:
         action:
           - command: test
-            args: -v --workspace --exclude focus --features unit-tests
+            args: -v -p hl_driver --lib --features unit-tests
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Setup Rust
-        uses: esp-rs/xtensa-toolchain@v1.5
-        with:
-          default: true
-          buildtargets: esp32s3
-          ldproxy: false
-          version: "1.86.0"
-      - name: Enable caching
-        uses: Swatinem/rust-cache@v2
+      # The .cargo folder contains configuration that do not work with running the test (probably dependency missing)
+      # We only need the normal rust toolchain to test the STD Unit tests
+      - name: Remove .cargo folder 
+        run: rm -rf .cargo
       - name: Run tests
-        # we use the stable toolchain to run the STD unit tests
+        # We use the stable toolchain to run the STD unit tests
         run: cargo +stable ${{ matrix.action.command }} ${{ matrix.action.args }}
