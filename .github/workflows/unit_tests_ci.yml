@@ -20,7 +20,7 @@ jobs:
       matrix:
         action:
           - command: test
-            args: -v -p hl_driver --lib --features unit-tests
+            args: -v --workspace --exclude focus --features unit-tests
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
