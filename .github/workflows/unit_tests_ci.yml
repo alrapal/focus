@@ -20,7 +20,7 @@ jobs:
       matrix:
         action:
           - command: test
-            args: -v --workspace -p hl_driver --features unit-tests
+            args: -v --workspace --exclude focus --features unit-tests
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -34,4 +34,5 @@ jobs:
       - name: Enable caching
         uses: Swatinem/rust-cache@v2
       - name: Run tests
-        run: cargo ${{ matrix.action.command }} ${{ matrix.action.args }}
+        # we use the stable toolchain to run the STD unit tests
+        run: cargo +stable ${{ matrix.action.command }} ${{ matrix.action.args }}
