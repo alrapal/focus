@@ -22,7 +22,7 @@ type DisplaySpiInterface = SPIInterface<
 >;
 
 // Complex type for the Screen driver
-type DisplayDriver = Gc9a01<
+pub type DisplayDriver = Gc9a01<
     DisplaySpiInterface,
     DisplayResolution240x240,
     BufferedGraphics<DisplayResolution240x240>,
