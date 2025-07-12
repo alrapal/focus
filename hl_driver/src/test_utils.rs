@@ -1,21 +1,19 @@
 use embedded_hal::digital::{ErrorKind, ErrorType, InputPin, PinState};
 
 /// ## Description
-///
 /// Mock of a simple gpio pin for unit tests
-///
-/// ## Example
-///
-/// ```rust
-/// use embedded_hal::digital::PinState;
-/// use hl_driver::test_utils::MockedPin;
-///
-/// let mocked_pin = MockedPin{state: PinState::High, fault: false};
-/// ```
-///
 pub struct MockedGpioPin {
     pub state: PinState,
     pub fault: bool,
+}
+
+impl Default for MockedGpioPin {
+    fn default() -> Self {
+        MockedGpioPin {
+            state: PinState::Low,
+            fault: false,
+        }
+    }
 }
 
 impl ErrorType for MockedGpioPin {
